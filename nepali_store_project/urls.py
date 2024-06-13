@@ -24,10 +24,10 @@ from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('products/', get_products, name='get_products'),
     path('products/<int:pk>/', get_product_detail, name='get_product_detail'),
-    path('users/create/', create_user, name='create_user'),
+    path('user/create/', create_user, name='create_user'),
     path('profiles/me/', get_profile, name='get_profile'),
     path('cart/', get_cart, name='get_cart'),
     path('cart/add/', add_to_cart, name='add_to_cart'),
@@ -39,6 +39,8 @@ urlpatterns = [
     path('product-images/', ProductImageListCreateView.as_view(), name='product_image_list_create'),
     path('product-images/<int:pk>/', ProductImageDetailView.as_view(), name='product_image_detail'),
     path('checkout/', checkout, name='checkout'),
+    path('create-payment-intent/', create_payment_intent, name='create-payment-intent'),
+    path('cart/<int:pk>/delete/', delete_cart_item, name='delete_cart_item'),
 ]
 if settings.DEBUG:
     from django.conf.urls.static import static

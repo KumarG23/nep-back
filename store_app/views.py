@@ -14,6 +14,26 @@ from django.views.decorators.csrf import csrf_exempt
 
 from .models import *
 from .serializers import *
+import stripe
+from django.conf import settings
+import json
+
+stripe.api_key = settings.STRIPE_SECRET_KEY
+@csrf_exempt
+@require_POST
+def create_payment_intent(request):
+    try:
+        data = json.loads(request.body)
+        amount = data['amount']
+
+        intent = stripe.PaymentIntent.create(
+            amount=amount,
+            currency='usd'
+        )
+
+        return JsonResponse({'clientSecret': intent['client_secret']})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
 
 # Products
 @api_view(['GET'])
@@ -31,7 +51,8 @@ def get_product_detail(request, pk):
     serializer = ProductSerializer(product)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
-# User
+# @csrf_exempt
+@require_POST
 @api_view(['POST'])
 @permission_classes([])
 def create_user(request):
@@ -112,38 +133,47 @@ def get_cart(request):
 def add_to_cart(request):
     product_id = request.POST.get('product_id')
     quantity = int(request.POST.get('quantity', 1))
-    name = request.POST.get('name')
-    price = request.POST.get('price')
-    print(f"Product ID: {product_id}, Quantity: {quantity}, Name: {name}, Price: {price}")
-
     product = get_object_or_404(Product, id=product_id)
 
     if request.user.is_authenticated:
         user = request.user
         cart, created = Cart.objects.get_or_create(user=user)
+        cart_product, created = CartProduct.objects.get_or_create(cart=cart, product=product)
+        if not created:
+            cart_product.quantity += quantity
+        else:
+            cart_product.quantity = quantity
+        cart_product.save()
+        cart_data = {
+            'message': 'Item added to cart successfully',
+            'cart_product_id': cart_product.id,
+            'product': {
+                'id': product.id,
+                'name': product.name,
+                'price': str(product.price),
+                'quantity': cart_product.quantity
+            }
+        }
     else:
         session_cart = request.session.get('cart', {})
         if str(product_id) in session_cart:
-            session_cart[str(product_id)] += quantity
+            session_cart[str(product_id)]['quantity'] += quantity
         else:
-            session_cart[str(product_id)] = quantity
+            session_cart[str(product_id)] = {
+                'id': product.id,
+                'name': product.name,
+                'price': str(product.price),
+                'quantity': quantity
+            }
         request.session['cart'] = session_cart
         request.session.save()
-        return JsonResponse({'message': 'Item added to cart successfully', 'cart': session_cart})
+        cart_data = {
+            'message': 'Item added to cart successfully',
+            'product': session_cart[str(product_id)]
+        }
 
-    cart_product, created = CartProduct.objects.get_or_create(cart=cart, product=product)
-    if not created:
-        cart_product.quantity += quantity
-    else:
-        cart_product.quantity = quantity
-    cart_product.save()
+    return JsonResponse(cart_data)
 
-    return JsonResponse({'message': 'Item added to cart successfully', 'product': {
-        'id': product.id,
-        'name': product.name,
-        'price': product.price,
-        'quantity': cart_product.quantity,
-    }})
 
 # Order
 @api_view(['GET'])
@@ -153,7 +183,8 @@ def get_orders(request):
     serializer = OrderSerializer(orders, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
-# Admin
+@csrf_exempt
+@require_POST
 @api_view(['POST'])
 @permission_classes([IsAdminUser])
 @parser_classes([MultiPartParser, FormParser])
@@ -188,6 +219,9 @@ def delete_product(request, pk):
     product.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
 
+
+@csrf_exempt
+@require_POST
 @api_view(['POST'])
 @permission_classes([])
 def create_guest_order(request):
@@ -267,5 +301,19 @@ def checkout(request):
     cart.delete()
 
     return JsonResponse({'message': 'Order placed successfully', 'order_id': order.id})
+
+@csrf_exempt
+@api_view(['DELETE'])
+def delete_cart_item(request, pk):
+    print(f"Received CartProduct ID for deletion: {pk}")
+    try: 
+        cart_product = get_object_or_404(CartProduct, pk=pk)
+        cart_product.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    except CartProduct.DoesNotExist:
+        return Response({'error': 'Item not found'})
+    
+
+        
 
 

@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 import os
 from pathlib import Path
 from datetime import timedelta
+import stripe
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -22,6 +23,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-r0)l%m#23xzf_ly(w@4*)l5oirqdkv@*80nu($+mh1#s$0vlth'
+STRIPE_SECRET_KEY = 'sk_test_51PRDH1KTI3hDF0HSvNZ9EEKUS4qxZDx39gJrCyUmvaoZd3eDpoCq5OOvqfxKVgZXaPnkZQCegZMyYESg4xkOpY6d00D8swNbE2'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -45,9 +47,9 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -91,10 +93,11 @@ CORS_ALLOWED_ORIGINS = [
     'http://localhost:8080',
 ]
 
-# CSRF_TRUSTED_ORIGINS = [
-#     'http://localhost:8000',  
-#     'http://localhost:5174',  
-# ]
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:8080',  
+    'http://localhost:5174',
+    'http://localhost:8000',
+]
 
 CORS_ALLOW_METHODS = [
     'GET',
@@ -108,7 +111,7 @@ CORS_ALLOW_METHODS = [
 CORS_ALLOW_HEADERS = [
     'Content-Type',
     'Authorization',
-    'X-CSRFToken',
+    # 'X-CSRFToken',
 ]
 
 
