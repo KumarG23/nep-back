@@ -19,8 +19,56 @@ from django.conf import settings
 import json
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([])
+def confirm_order(request):
+    try:
+        payment_intent_id = request.data.get('payment_intent_id')
+        if not payment_intent_id:
+            return Response({'error': 'Payment intent ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Retrieve the PaymentIntent details from Stripe
+        payment_intent = stripe.PaymentIntent.retrieve(payment_intent_id)
+        
+        # Extract details from the payment intent
+        total_price = payment_intent.amount_received / 100  # Stripe amount is in cents
+        email = payment_intent.charges.data[0].billing_details.email
+        items = payment_intent.metadata.items  # Assuming you stored items in metadata
+        
+        with transaction.atomic():
+            # Create a new order
+            order = Order.objects.create(
+                user=None,
+                total_price=total_price
+            )
+
+            # Create order items
+            for item in json.loads(items):
+                product = Product.objects.get(id=item['product_id'])
+                OrderItem.objects.create(
+                    order=order,
+                    product=product,
+                    quantity=item['quantity'],
+                    price=product.price
+                )
+
+            order_serialized = OrderSerializer(order)
+            return Response(order_serialized.data, status=status.HTTP_201_CREATED)
+    except stripe.error.StripeError as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Product.DoesNotExist:
+        return Response({'error': 'One or more products not found'}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+
 @csrf_exempt
 @require_POST
+@permission_classes([])
 def create_payment_intent(request):
     try:
         data = json.loads(request.body)
@@ -31,7 +79,7 @@ def create_payment_intent(request):
             currency='usd'
         )
 
-        return JsonResponse({'clientSecret': intent['client_secret']})
+        return JsonResponse({'clientSecret': intent.client_secret, 'payment_intent': intent.id})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
 
@@ -314,6 +362,34 @@ def delete_cart_item(request, pk):
         return Response({'error': 'Item not found'})
     
 
-        
+
+    
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_order(request):
+    try:
+        data = request.data
+        user = request.user
+
+        order = Order.objects.create(
+            user=user,
+            total_price=data['total_price']
+        )
+
+        for item in data['cart']:
+            product = get_object_or_404(Product, id=item['product_id'])
+            OrderItem.objects.create(
+                order=order,
+                product=product,
+                quantity=item['quantity'],
+                price=product.price
+            )
+
+        return JsonResponse({'message': 'Order created successfully'}, status=201)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+ 
 
 

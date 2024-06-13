@@ -31,16 +31,21 @@ urlpatterns = [
     path('profiles/me/', get_profile, name='get_profile'),
     path('cart/', get_cart, name='get_cart'),
     path('cart/add/', add_to_cart, name='add_to_cart'),
-    path('orders/', get_orders, name='get_orders'),
+    path('orders/', create_order, name='create_order'),
+    path('orders/get', get_orders, name='get_orders'),
     path('admin/products/add/', add_product, name='add_product'),
     path('admin/products/<int:pk>/update/', update_product, name='update_product'),
     path('admin/products/<int:pk>/delete/', delete_product, name='delete_product'),
-    path('orders/guest/create/', create_guest_order, name='create_guest_order'),
+    path('orders/guest/', create_guest_order, name='create_guest_order'),
     path('product-images/', ProductImageListCreateView.as_view(), name='product_image_list_create'),
     path('product-images/<int:pk>/', ProductImageDetailView.as_view(), name='product_image_detail'),
     path('checkout/', checkout, name='checkout'),
     path('create-payment-intent/', create_payment_intent, name='create-payment-intent'),
     path('cart/<int:pk>/delete/', delete_cart_item, name='delete_cart_item'),
+    path('orders/confirm', confirm_order, name='confirm_order')
+    # path('create-checkout-session/', create_checkout_session, name='create_checkout_session'),
+    # path('order/success/', order_success, name='order_success'),
+
 ]
 if settings.DEBUG:
     from django.conf.urls.static import static
