@@ -117,6 +117,7 @@ CORS_ALLOWED_ORIGINS = [
     'http://localhost:8080',
     'https://nep-front-5kbxd4xed-neal-sharmas-projects.vercel.app',
     'https://nep-front-vna5bd4be-neal-sharmas-projects.vercel.app',
+    'https://nep-front-lltvxm5b2-neal-sharmas-projects.vercel.app',
 ]
 
 CSRF_TRUSTED_ORIGINS = [
