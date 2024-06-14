@@ -26,9 +26,20 @@ SECRET_KEY = 'django-insecure-r0)l%m#23xzf_ly(w@4*)l5oirqdkv@*80nu($+mh1#s$0vlth
 STRIPE_SECRET_KEY = 'sk_test_51PRDH1KTI3hDF0HSvNZ9EEKUS4qxZDx39gJrCyUmvaoZd3eDpoCq5OOvqfxKVgZXaPnkZQCegZMyYESg4xkOpY6d00D8swNbE2'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
 
-ALLOWED_HOSTS = []
+APP_NAME = os.getenv("FLY_APP_NAME", None)
+
+DATABASE_PATH = os.getenv("DATABASE_PATH", None)
+
+ALLOWED_HOSTS = ['127.0.0.1', f"{APP_NAME}.fly.dev"]
+
+ENVIRONMENT = os.getenv('ENVIRONMENT', 'local')
+
+DEBUG = False
+if ENVIRONMENT == 'local':
+  DEBUG = True
+
+SECRET_KEY = os.getenv('SECRET_KEY', 'a default-value for local dev')
 
 
 # Application definition
@@ -49,6 +60,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -56,6 +68,18 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+STORAGES = {
+    'default': {
+        'BACKEND': "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
+
 
 REST_FRAMEWORK = {
        'DEFAULT_AUTHENTICATION_CLASSES': [
@@ -91,12 +115,15 @@ WSGI_APPLICATION = 'nepali_store_project.wsgi.application'
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:5174',
     'http://localhost:8080',
+    'https://nep-front-5kbxd4xed-neal-sharmas-projects.vercel.app',
+    'https://nep-front-vna5bd4be-neal-sharmas-projects.vercel.app',
 ]
 
 CSRF_TRUSTED_ORIGINS = [
-    'http://localhost:8080',  
-    'http://localhost:5174',
-    'http://localhost:8000',
+    # 'http://localhost:8080',  
+    # 'http://localhost:5174',
+    # 'http://localhost:8000',
+    f"https://{APP_NAME}.fly.dev"
 ]
 
 CORS_ALLOW_METHODS = [
@@ -114,15 +141,21 @@ CORS_ALLOW_HEADERS = [
     # 'X-CSRFToken',
 ]
 
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+if APP_NAME:
+  MEDIA_ROOT = '/mnt/volume_mount/media/'
+
+
 
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+	'default': {
+    		'ENGINE': 'django.db.backends.sqlite3',
+    		'NAME': DATABASE_PATH if APP_NAME else BASE_DIR / 'db.sqlite3',
+	}
 }
 
 SIMPLE_JWT = {
