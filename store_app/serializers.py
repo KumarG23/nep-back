@@ -55,11 +55,12 @@ class OrderItemSerializer(serializers.ModelSerializer):
 
 class OrderSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
-    order_items = OrderItemSerializer(many=True, read_only=True, source='orderitem_set')
+    order_items = OrderItemSerializer(many=True, read_only=True)
 
     class Meta:
         model = Order
-        fields = ['id', 'user', 'created_at', 'total_price', 'order_items']
+        fields = ['id', 'user', 'created_at', 'total_price', 'order_items', 'payment_intent_id'] 
+
 
 class ReviewSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)

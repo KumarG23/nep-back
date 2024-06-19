@@ -17,6 +17,9 @@ from .serializers import *
 import stripe
 from django.conf import settings
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -25,28 +28,55 @@ stripe.api_key = settings.STRIPE_SECRET_KEY
 @permission_classes([])
 def confirm_order(request):
     try:
+        logger.debug("Request data: %s", request.data)
         payment_intent_id = request.data.get('payment_intent_id')
         if not payment_intent_id:
+            logger.error("Payment intent ID is missing")
             return Response({'error': 'Payment intent ID is required'}, status=status.HTTP_400_BAD_REQUEST)
 
         # Retrieve the PaymentIntent details from Stripe
-        payment_intent = stripe.PaymentIntent.retrieve(payment_intent_id)
-        
+        try:
+            payment_intent = stripe.PaymentIntent.retrieve(payment_intent_id)
+            logger.debug("Payment intent retrieved: %s", payment_intent)
+        except stripe.error.StripeError as e:
+            logger.error("Stripe error when retrieving PaymentIntent: %s", str(e))
+            return Response({'error': 'Failed to retrieve PaymentIntent from Stripe'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Log the entire payment intent for debugging
+        logger.debug("Full payment intent object: %s", payment_intent)
+
         # Extract details from the payment intent
         total_price = payment_intent.amount_received / 100  # Stripe amount is in cents
-        email = payment_intent.charges.data[0].billing_details.email
-        items = payment_intent.metadata.items  # Assuming you stored items in metadata
-        
+
+        email = None
+        if payment_intent.charges and payment_intent.charges.data:
+            email = payment_intent.charges.data[0].billing_details.email
+        else:
+            logger.error("No charges found in payment intent or billing details missing")
+            return Response({'error': 'No charges found in payment intent or billing details missing'}, status=status.HTTP_400_BAD_REQUEST)
+
+        items = request.data.get('cart')  # Get cart items from request data
+        if not items:
+            logger.error("Items metadata is missing")
+            return Response({'error': 'Cart items are required'}, status=status.HTTP_400_BAD_REQUEST)
+
         with transaction.atomic():
             # Create a new order
+            user = request.user if request.user.is_authenticated else None
             order = Order.objects.create(
-                user=None,
-                total_price=total_price
+                user=user,
+                total_price=total_price,
+                payment_intent_id=payment_intent_id  # Ensure this is added
             )
 
             # Create order items
-            for item in json.loads(items):
-                product = Product.objects.get(id=item['product_id'])
+            for item in items:
+                try:
+                    product = Product.objects.get(id=item['product_id'])
+                except Product.DoesNotExist:
+                    logger.error("Product with ID %s not found", item['product_id'])
+                    return Response({'error': f'Product with ID {item["product_id"]} not found'}, status=status.HTTP_400_BAD_REQUEST)
+
                 OrderItem.objects.create(
                     order=order,
                     product=product,
@@ -55,33 +85,56 @@ def confirm_order(request):
                 )
 
             order_serialized = OrderSerializer(order)
+            logger.debug("Order created successfully: %s", order_serialized.data)
             return Response(order_serialized.data, status=status.HTTP_201_CREATED)
     except stripe.error.StripeError as e:
+        logger.error("Stripe error: %s", str(e))
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-    except Product.DoesNotExist:
-        return Response({'error': 'One or more products not found'}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
+        logger.error("Unexpected error: %s", str(e))
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 
 
-@csrf_exempt
-@require_POST
+
+# @csrf_exempt
+# @require_POST
+@api_view(['POST'])
 @permission_classes([])
 def create_payment_intent(request):
+    print('CREATE PAYMENT INTENT: REQUEST: ', request.data)
     try:
-        data = json.loads(request.body)
-        amount = data['amount']
-
+        amount = request.data['amount']
+        
         intent = stripe.PaymentIntent.create(
-            amount=amount,
-            currency='usd'
+            amount = amount,
+            currency = 'usd'
         )
-
+        print ('INTENT >>>>>>>>>>>>', intent)
         return JsonResponse({'clientSecret': intent.client_secret, 'payment_intent': intent.id})
     except Exception as e:
+        print('ERROR: ', e)
         return JsonResponse({'error': str(e)}, status=400)
+
+
+@api_view(['POST'])
+@permission_classes([])
+def create_confirm_intent(request):
+    try:
+        response = stripe.PaymentIntent.create(
+            confirm=True,
+            amount = request.data['amount'],
+            currency = 'usd',
+            automatic_payment_methods= {'enabled': True},
+            confirmation_token=request.data['confirmation_token_id']
+        )
+        print(response)
+        return Response(response)
+    except Exception as e:
+        print('ERROR: ', e)
+        return Response(str(e), status=400)
+
 
 # Products
 @api_view(['GET'])
@@ -229,12 +282,15 @@ def add_to_cart(request):
 def get_orders(request):
     orders = Order.objects.filter(user=request.user)
     serializer = OrderSerializer(orders, many=True)
+    print(serializer.data)
     return Response(serializer.data, status=status.HTTP_200_OK)
+    
+   
 
 @csrf_exempt
 @require_POST
 @api_view(['POST'])
-@permission_classes([IsAdminUser])
+@permission_classes([])
 @parser_classes([MultiPartParser, FormParser])
 def add_product(request):
     serializer = ProductSerializer(data=request.data)
@@ -244,7 +300,7 @@ def add_product(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['PUT'])
-@permission_classes([IsAdminUser])
+@permission_classes([])
 @parser_classes([MultiPartParser, FormParser])
 def update_product(request, pk):
     try:
@@ -257,15 +313,15 @@ def update_product(request, pk):
         return Response(serializer.data, status=status.HTTP_200_OK)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-@api_view(['DELETE'])
-@permission_classes([IsAdminUser])
-def delete_product(request, pk):
-    try:
-        product = Product.objects.get(pk=pk)
-    except Product.DoesNotExist:
-        return Response({'error': 'Product not found'}, status=status.HTTP_404_NOT_FOUND)
-    product.delete()
-    return Response(status=status.HTTP_204_NO_CONTENT)
+# @api_view(['DELETE'])
+# @permission_classes([IsAdminUser])
+# def delete_product(request, pk):
+#     try:
+#         product = Product.objects.get(pk=pk)
+#     except Product.DoesNotExist:
+#         return Response({'error': 'Product not found'}, status=status.HTTP_404_NOT_FOUND)
+#     product.delete()
+#     return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @csrf_exempt
@@ -367,18 +423,29 @@ def delete_cart_item(request, pk):
 
 @csrf_exempt
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([])
 def create_order(request):
     try:
         data = request.data
-        user = request.user
+
+        print('received data: ', data)
+
+        total_price = data.get('total_price')
+        print('total price: ', total_price)
+
+        payment_intent_id = data.get('payment_intent_id')
+        print('payment id', payment_intent_id);
+
+        user = request.user if request.user.is_authenticated else None
 
         order = Order.objects.create(
             user=user,
-            total_price=data['total_price']
+            total_price=total_price,
+            payment_intent_id=payment_intent_id,
         )
+        print('user: ', user)
 
-        for item in data['cart']:
+        for item in data['products']:
             product = get_object_or_404(Product, id=item['product_id'])
             OrderItem.objects.create(
                 order=order,
@@ -386,6 +453,7 @@ def create_order(request):
                 quantity=item['quantity'],
                 price=product.price
             )
+            print('order items: ', product)
 
         return JsonResponse({'message': 'Order created successfully'}, status=201)
     except Exception as e:
@@ -393,3 +461,8 @@ def create_order(request):
  
 
 
+@api_view(['GET'])
+def category_list(request):
+    categories = Category.objects.all()
+    serializer = CategorySerializer(categories, many=True)
+    return Response(serializer.data)

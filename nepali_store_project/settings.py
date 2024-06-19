@@ -115,16 +115,20 @@ WSGI_APPLICATION = 'nepali_store_project.wsgi.application'
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:5174',
     'http://localhost:8080',
-    'https://nep-front-5kbxd4xed-neal-sharmas-projects.vercel.app',
-    'https://nep-front-vna5bd4be-neal-sharmas-projects.vercel.app',
-    'https://nep-front-lltvxm5b2-neal-sharmas-projects.vercel.app',
+    'https://nep-front-kumarg23-neal-sharmas-projects.vercel.app',
+    'https://nep-front-neal-sharmas-projects.vercel.app',
+    'https://nep-front.vercel.app',
 ]
 
 CSRF_TRUSTED_ORIGINS = [
-    # 'http://localhost:8080',  
-    # 'http://localhost:5174',
-    # 'http://localhost:8000',
-    f"https://{APP_NAME}.fly.dev"
+    'http://localhost:8080',  
+    'http://localhost:5174',
+    'http://localhost:8000',
+    'http://127.0.0.1:8000',
+    f"https://{APP_NAME}.fly.dev",
+    'https://nep-front-kumarg23-neal-sharmas-projects.vercel.app',
+    'https://nep-front-neal-sharmas-projects.vercel.app',
+    'https://nep-front.vercel.app',
 ]
 
 CORS_ALLOW_METHODS = [
