@@ -118,6 +118,7 @@ CORS_ALLOWED_ORIGINS = [
     'https://nep-front-kumarg23-neal-sharmas-projects.vercel.app',
     'https://nep-front-neal-sharmas-projects.vercel.app',
     'https://nep-front.vercel.app',
+    'https://nepali-threads.vercel.app',
 ]
 
 CSRF_TRUSTED_ORIGINS = [
@@ -129,6 +130,7 @@ CSRF_TRUSTED_ORIGINS = [
     'https://nep-front-kumarg23-neal-sharmas-projects.vercel.app',
     'https://nep-front-neal-sharmas-projects.vercel.app',
     'https://nep-front.vercel.app',
+    'https://nepali-threads.vercel.app',
 ]
 
 CORS_ALLOW_METHODS = [
